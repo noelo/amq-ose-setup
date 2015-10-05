@@ -1,34 +1,25 @@
 Creating keystore
------------
-openssl genrsa -aes256 -out server.key 1024
+-----------------
 
-openssl req -x509 -sha256 -new -key server.key -out server.csr
+NOTE: Ensure CN in step 2 is set to the hostname of the AMQ route which is exposed below
+NOTE: When prompted for passwords use password
 
-openssl x509 -sha256 -days 3652 -in server.csr -signkey server.key -out selfsigned.crt
+keytool -genkey -alias broker -keyalg RSA -keystore keystore.jks
+keytool -export -alias broker -keystore keystore.jks -file broker_cert
+keytool -genkey -alias client -keyalg RSA -keystore client.jks
+keytool -import -alias broker -keystore client.jks -file broker_cert
 
-openssl pkcs12 -export -name myservercert -in selfsigned.crt -inkey server.key -out keystore.p12
+cp client.jks truststore.jks
 
-keytool -importkeystore -destkeystore mykeystore.jks -srckeystore keystore.p12 -srcstoretype pkcs12 -alias myservercert
-
-keytool -list -v -keystore mykeystore.jks
-
-
-Creating truststore
-------------
-keytool -import -file selfsigned.crt -alias firstCA -keystore mytruststore
-
-keytool -list -v -keystore mytruststore
-
-mv mytruststore mytruststore.jks
+oc secrets new amq-app-secret keystore.jks truststore.jks
 
 
-Base64 encoding for OSE
-------------------------------
-cat mykeystore.jks |base64 -w 0
+Add keystore and truststore to secret
+-------------------------------------
 
-cat mytruststore.jks |base64 -w 0
+oc secrets new amq-app-secret keystore.jks truststore.jks
 
-Copy and paste into the amq-secret.json 
+oc get secret amq-app-secret -o json >> amq-secret.json
 
 
 Broker setup
@@ -45,6 +36,19 @@ oc secrets add serviceaccount/amq-service-account secret/amq-app-secret --for=mo
 oc process -f ./amq6-persistent.json  -v AMQ_ADMIN_USERNAME=admin,AMQ_ADMIN_PASSWORD=admin,AMQ_TRUSTSTORE=truststore.jks,AMQ_KEYSTORE=keystore.jks|oc create -f -
 
 
+
+Expose the route
+----------------
+oc expose service broker-amq-tcp-ssl
+
+Edit the route to add ssl termination
+
+oc edit route broker-amq-tcp-ssl
+
+Add under spec after host
+  tls:
+    termination: passthrough
+
 Removing everything
 -------------------
 oc delete all -l application=broker
@@ -56,4 +60,3 @@ oc delete secret amq-app-secret
 oc delete pvc broker-amq-claim
 
 oc delete pv pv0001
-

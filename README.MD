@@ -2,11 +2,15 @@ Creating keystore
 -----------------
 
 NOTE: Ensure CN in step 2 is set to the hostname of the AMQ route which is exposed below
+
 NOTE: When prompted for passwords use password
 
 keytool -genkey -alias broker -keyalg RSA -keystore keystore.jks
+
 keytool -export -alias broker -keystore keystore.jks -file broker_cert
+
 keytool -genkey -alias client -keyalg RSA -keystore client.jks
+
 keytool -import -alias broker -keystore client.jks -file broker_cert
 
 cp client.jks truststore.jks
